@@ -1,0 +1,12 @@
+{
+	"authors": [
+		"LestvitsaDev"
+	],
+	"copyright": "no",
+	"dependencies": {
+		"vibe-d": "~>0.9"
+	},
+	"description": "API server for PsalterApp",
+	"license": "no",
+	"name": "api-server"
+}
