@@ -1,54 +1,73 @@
+import hibernated.core;
 import std.datetime;
+import std.string : format;
 
-struct Group
+class Group
 {
-	string id;
-	string name;
+    long id;
+    string name;
+    @OneToMany User[] users;
+
+    public this()
+    {
+    }
+
+    public this(string name)
+    {
+        this.name = name;
+    }
 }
 
-struct User
+class User
 {
-	string id;
-	string name;
-	string password;
-	string groupId;
+    long id;
+    string name;
+    string password;
+    @ManyToOne Group group;
+
+    override string toString()
+    {
+        return "[%s, %s, %s]".format(id, name, password);
+    }
 }
 
 struct Reading
 {
-	int kathismaNumber;
-	string userId;
+    int kathismaNumber;
+    string userId;
 }
 
 struct Reminder
 {
-	int id;
-	string userId;
-	TimeOfDay time;
+    int id;
+    string userId;
+    TimeOfDay time;
 }
 
 enum PrayerType
 {
-	FOR_ALIVE, FOR_DECEASED
+    ABOUT_ALIVE,
+    ABOUT_DECEASED //о заблудших
 }
 
-struct UserPrayerRequest
+enum Period
 {
-	int id;
-	string userId;
-	string name;
-	string surname;
-	PrayerType type;
-	Date created;
-	
+    FORTY_DAYS,
+    ONE_MONTH,
+    SIX_MONTHS,
+    ONE_YEAR,
+    ALWAYS
 }
 
-struct GroupPrayerRequest
+struct PrayerRequest
 {
-	int id;
-	string groupId;
-	string name;
-	PrayerType type;
-	Date date;	
-}
+    //	int id;
+    //	string userId;
 
+    PrayerType type;
+    Period reading;
+    Date created;
+    string prescript;
+    string name;
+    string surname;
+}
