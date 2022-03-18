@@ -1,12 +1,24 @@
 {
+	"name": "api-server",
+	"description": "API server for PsalterApp",
+	"homepage": "no",
 	"authors": [
 		"LestvitsaDev"
 	],
 	"copyright": "no",
-	"dependencies": {
-		"vibe-d": "~>0.9"
-	},
-	"description": "API server for PsalterApp",
 	"license": "no",
-	"name": "api-server"
+	"targetType": "executable",
+	"dependencies": {
+		"vibe-d": "~>0.9.4",
+		"ddbc": "~>0.5.4",
+		"hibernated": "~>0.3.6"
+	},
+	"configurations": [
+		{
+			"name": "default",
+			"subConfigurations": {
+				"ddbc": "MySQL"
+			}
+		}
+	]
 }
