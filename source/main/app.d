@@ -3,43 +3,51 @@ import vibe.core.log;
 import vibe.http.router;
 import vibe.http.server;
 import vibe.web.rest;
-
 import ddbc.drivers.mysqlddbc;
-
 import hibernated.core;
-
+import std.stdio : writeln;
+import std.datetime;
 import model;
+
+alias hibernated.session.Session Session;
 
 @path("api")
 interface DataStore
 {
 
     @method(HTTPMethod.GET)
-    User getUser(string name);
+    User getUser(string key);
 
-    // The following curl command adds a user:
-    // curl -X POST localhost:8080/api/add_user -H 'Content-Type: application/json' -d '{"name":"noname", "password":"secret", "groupId":1}'
-    @method(HTTPMethod.POST)
-    @path("add_user")
-    long addUser(string name, string password, int groupId);
-    
-//    @method(HTTPMethod.POST)
-//    @path("add_group")
-//    long addGroup(string name);
-
-    //    // GET /all_groups -> responds {"id": "...", "name": ...}
-    //    Group[] getAllGroups();
-    //
     // GET /all_users -> responds {"id": "...", "name": ... , ...}
     // curl localhost:8080/api/user/all
     @path("user/all")
     User[] getAllUsers();
+
+    // The following curl command adds a user:
+    // curl -X POST localhost:8080/api/add_user -H 'Content-Type: application/json' -d '{"name":"noname", "key":"secret", "groupId":1}'
+    @method(HTTPMethod.POST)
+    @path("add_user")
+    long addUser(string name, string key, int groupId);
+
+    // GET /all_groups -> responds {"id": "...", "name": ...}
+    @path("group/all")
+    Group[] getAllGroups();
+
+    @method(HTTPMethod.POST)
+    @path("add_group")
+    long addGroup(string name, string key);
+
+    long addPrayerRequest(string userKey, string prescript, string name, string surname,
+            string common, string prayerType, string readingPeriod, string createdDate);
+
+    string[] getPrayerListForUser(string userKey);
+
+    string[] getPrayerListForGroup(string groupKey);
+
     //
     //    User[] getUsersForGroup(string groupName);
     //
-    //    string[] getPrayerListForUser(string userName);
     //
-    //    string[] getPrayerListForGroup(string groupName);
     //
     //    void putUser(string name, string password, int groupId);
     //
@@ -49,9 +57,9 @@ interface DataStore
 
 class DataStoreImpl : DataStore
 {
-    hibernated.session.Session sess;
+    Session sess;
 
-    this(hibernated.session.Session hibernateSession)
+    this(Session hibernateSession)
     {
         this.sess = hibernateSession;
     }
@@ -60,20 +68,30 @@ class DataStoreImpl : DataStore
     {
     }
 
-    User getUser(string name)
+    User getUser(string key)
     {
         // load and check data
-        User u = sess.createQuery("FROM User WHERE name=:Name")
-            .setParameter("Name", name).uniqueResult!User();
+        User u = sess.createQuery("FROM User WHERE key=:Key")
+            .setParameter("Key", key).list!User()[0];
+
+        writeln(u);
         return u;
     }
 
-    long addUser(string name, string password, int groupId)
+    User[] getAllUsers()
+    {
+        // read all users using query
+        Query q = sess.createQuery("FROM User ORDER BY name");
+        User[] list = q.list!User();
+        return list;
+    }
+
+    long addUser(string name, string key, int groupId)
     {
         User newUser = new User();
         //        newUser.id = cast(int) users.length + 1;
         newUser.name = name;
-        newUser.password = password;
+        newUser.key = key;
         //        newUser.groupId = groupId;
         sess.save(newUser);
         return -1;
@@ -90,19 +108,59 @@ class DataStoreImpl : DataStore
     //        return groups;
     //    }
     //
-    User[] getAllUsers()
+
+    Group[] getAllGroups()
     {
-        // read all users using query
-        Query q = sess.createQuery("FROM User ORDER BY name");
-        User[] list = q.list!User();
-        return list;
+        Query q = sess.createQuery("FROM Group ORDER BY name");
+        return q.list!Group();
     }
-    
-//     long addGroup(string name){
-//     	sess.save(new Group(name));
-//     	return -1;
-//     }
-    
+
+    long addGroup(string name, string key)
+    {
+        Group g = new Group();
+        g.name = name;
+        g.key = key;
+        sess.save(g);
+        return -1;
+    }
+
+    long addPrayerRequest(string userKey, string prescript, string name, string surname,
+            string common, string prayerType, string readingPeriod, string createdDate)
+    {
+        User user = getUser(userKey);
+        PrayerRequest prayerRequest = new PrayerRequest(prescript, name,
+                surname, common, prayerType, readingPeriod, createdDate);
+        prayerRequest.owner = user;
+        writeln("prayerRequest = ", prayerRequest);
+
+        sess.save(prayerRequest);
+
+        return prayerRequest.id;
+    }
+
+    string[] getPrayerListForUser(string userKey)
+    {
+        //        User user = sess.createQuery("FROM User WHERE key=:Key")
+        //            .setParameter("Key", userKey).uniqueResult!User();
+        /////////////////////////////////////////////////////  
+        User user = sess.createQuery("FROM User WHERE name=:Name")
+            .setParameter("Name", "User1").list!User()[0];
+        writeln(user);
+        /////////////////////////////////////////////////////
+
+        string[] prayerList = new string[user.prayerList.length];
+        foreach (i, e; user.prayerList)
+        {
+            prayerList[i] = e.prescript ~ " " ~ e.name ~ " " ~ e.surname;
+        }
+        return prayerList;
+    }
+
+    string[] getPrayerListForGroup(string groupKey)
+    {
+        return [];
+    }
+
     //
     //    User[] getUsersForGroup(string groupName)
     //    {
@@ -140,7 +198,7 @@ void confORM()
 void main()
 {
     // create metadata from annotations
-    EntityMetaData schema = new SchemaInfoImpl!(User, Group);
+    EntityMetaData schema = new SchemaInfoImpl!(User, Group, PrayerRequest);
 
     // setup DB connection factory
     MySQLDriver driver = new MySQLDriver();
@@ -172,6 +230,32 @@ void main()
     scope (exit)
         sess.close();
 
+    /////////////////////////////////////////////////////
+    //    // create sample data
+    //    PrayerRequest pr1 = new PrayerRequest();
+    //    pr1.name = "Ioann";
+    //    PrayerRequest pr2 = new PrayerRequest();
+    //    pr2.name = "Lidiya";
+    //    Group g1 = new Group("Group1", "402jgh255");
+    //    User u1 = new User("User1", "1234567890");
+    //    u1.prayerList = [pr1, pr2];
+    //    pr1.owner = u1;
+    //    pr2.owner = u1;
+    //    u1.group = g1;
+    //
+    //    sess.save(g1);
+    //    sess.save(u1);
+    //    sess.save(pr1);
+    //    sess.save(pr2);
+    //
+    //    writeln(u1);
+    //    // load and check data
+    //    User u11 = sess.createQuery("FROM User WHERE name=:Name")
+    //        .setParameter("Name", "User1").list!User()[$ - 1];
+    //
+    //    writeln(u11);
+    /////////////////////////////////////////////////////
+
     // use session to access DB
     auto dataStore = new DataStoreImpl(sess);
 
@@ -183,17 +267,33 @@ void main()
     settings.bindAddresses = ["::1", "127.0.0.1"];
     listenHTTP(settings, router);
 
-    logInfo("Please open http://127.0.0.1:8080/ in your browser.");
+    logInfo("Server started on http://127.0.0.1:8080/");
 
-    // create a client to talk to the API implementation over the REST interface
-//    runTask({
-//        auto client = new RestInterfaceClient!DataStore("http://127.0.0.1:8080/");
-////        client.addUser("Vasya", "xCdgnbd3eos", 1);
-////        client.addUser("Ivan", "xldLkDekn89", 1);
-//        auto users = client.getAllUsers();
-//        logInfo("Users: %s", users);
-//    });
+    addSampleDataToDB();
 
     runApplication();
 
+}
+
+private void addSampleDataToDB()
+{
+    version (SERVER_CONNECTION_1)
+    {
+        // create a client to talk to the API implementation over the REST interface
+        runTask({
+            auto client = new RestInterfaceClient!DataStore("http://127.0.0.1:8080/");
+            client.addUser("Vasya", "xCdgnbd3eos", 1);
+            client.addUser("Ivan", "xldLkDekn89", 1);
+            auto users = client.getAllUsers();
+            logInfo("Users: %s", users);
+        });
+    }
+    version (SERVER_CONNECTION_2)
+    {
+        runTask({
+            auto client = new RestInterfaceClient!DataStore("http://127.0.0.1:8080/");
+            long i = client.addPrayerRequest();
+            logInfo("client.addPrayerRequest() returns %s", i);
+        });
+    }
 }
