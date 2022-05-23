@@ -1,9 +1,9 @@
 ## Серверная часть приложения для чтения Псалтири в Лествице ##
 
-*Серверное консольное приложение на Vibe.d*
+*API-сервер на Vibe.d*
 
 ## MySQL ##
-```
+```BASH
 mysql> create database api_db; -- Creates the new database
 mysql> create user 'api'@'localhost' identified by 'LestvitsaDev'; -- Creates the user
 mysql> grant all on api_db.* to 'api'@'localhost'; -- Gives all privileges to the new user on the newly created database
@@ -15,11 +15,18 @@ mysql> grant all on api_db.* to 'api'@'localhost'; -- Gives all privileges to th
 $ mysql -u api -p
 
 ## Build ##
-time dub build && dub run
-Новый компоновщик ускоряет сборку в 4 раза update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.gold" 20
+```BASH
+time dub build && dub run 
+```
+Новый компоновщик ускоряет сборку в 4 раза 
+```BASH
+update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.gold" 20
+```
 
 ### Остановка приложения ###
+```BASH
 ps ax | grep api-server | cut -f 2 -d " " | cut -d $'\n' -f 1 > kill -n 
+```
 
 ## README ##
 
