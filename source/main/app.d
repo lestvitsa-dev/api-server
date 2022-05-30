@@ -40,9 +40,11 @@ interface DataStore
     long addPrayerRequest(string userKey, string prescript, string name, string surname,
             string common, string prayerType, string readingPeriod, string createdDate);
 
-    string[] getPrayerListForUser(string userKey);
+    PrayerRequest[] getPrayerListForUser(string userKey);
 
-    string[] getPrayerListForGroup(string groupKey);
+    PrayerRequest[] getPrayerListForGroup(string groupKey);
+
+    PrayerRequest getPrayerRequest(long key);
 
     //
     //    User[] getUsersForGroup(string groupName);
@@ -64,18 +66,17 @@ class DataStoreImpl : DataStore
         this.sess = hibernateSession;
     }
 
-    this()
-    {
-    }
-
     User getUser(string key)
     {
         // load and check data
-        User u = sess.createQuery("FROM User WHERE key=:Key")
-            .setParameter("Key", key).list!User()[0];
+        User[] list = sess.createQuery("FROM User WHERE key=:Key")
+            .setParameter("Key", key).list!User();
+        if (list.length == 0)
+            return null;
+        User user = list[0];
+        logInfo("User: %s", user);
 
-        writeln(u);
-        return u;
+        return user;
     }
 
     User[] getAllUsers()
@@ -94,7 +95,7 @@ class DataStoreImpl : DataStore
         newUser.key = key;
         //        newUser.groupId = groupId;
         sess.save(newUser);
-        return -1;
+        return newUser.id;
     }
 
     //    private
@@ -121,7 +122,7 @@ class DataStoreImpl : DataStore
         g.name = name;
         g.key = key;
         sess.save(g);
-        return -1;
+        return g.id;
     }
 
     long addPrayerRequest(string userKey, string prescript, string name, string surname,
@@ -131,34 +132,36 @@ class DataStoreImpl : DataStore
         PrayerRequest prayerRequest = new PrayerRequest(prescript, name,
                 surname, common, prayerType, readingPeriod, createdDate);
         prayerRequest.owner = user;
-        writeln("prayerRequest = ", prayerRequest);
+        logInfo("prayerRequest = %s", prayerRequest);
 
         sess.save(prayerRequest);
 
         return prayerRequest.id;
     }
 
-    string[] getPrayerListForUser(string userKey)
+    PrayerRequest[] getPrayerListForUser(string userKey)
     {
-        //        User user = sess.createQuery("FROM User WHERE key=:Key")
-        //            .setParameter("Key", userKey).uniqueResult!User();
-        /////////////////////////////////////////////////////  
-        User user = sess.createQuery("FROM User WHERE name=:Name")
-            .setParameter("Name", "User1").list!User()[0];
-        writeln(user);
-        /////////////////////////////////////////////////////
+        User[] list = sess.createQuery("FROM User WHERE key=:Key")
+            .setParameter("Key", userKey).list!User();
+        if (list.length == 0)
+            return [];
+        User user = list[0];
+        logInfo("PrayerList: %s", user.prayerList);
 
-        string[] prayerList = new string[user.prayerList.length];
-        foreach (i, e; user.prayerList)
-        {
-            prayerList[i] = e.prescript ~ " " ~ e.name ~ " " ~ e.surname;
-        }
-        return prayerList;
+        return user.prayerList;
     }
 
-    string[] getPrayerListForGroup(string groupKey)
+    PrayerRequest[] getPrayerListForGroup(string groupKey)
     {
         return [];
+    }
+
+    PrayerRequest getPrayerRequest(long id)
+    {
+        PrayerRequest[] list = sess.createQuery("FROM PrayerRequest WHERE id=:Id")
+            .setParameter("Id", id).list!PrayerRequest();
+
+        return list[0];
     }
 
     //

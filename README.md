@@ -1,4 +1,4 @@
-## Серверная часть приложения для чтения Псалтири в Лествице ##
+# Серверная часть приложения для чтения Псалтири в Лествице #
 
 *API-сервер на Vibe.d*
 
@@ -18,7 +18,7 @@ $ mysql -u api -p
 ```BASH
 time dub build && dub run 
 ```
-Новый компоновщик ускоряет сборку в 4 раза 
+### Новый компоновщик ускоряет сборку в 4 раза ###
 ```BASH
 update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.gold" 20
 ```
@@ -26,6 +26,10 @@ update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.gold" 20
 ### Остановка приложения ###
 ```BASH
 ps ax | grep api-server | cut -f 2 -d " " | cut -d $'\n' -f 1 > kill -n 
+```
+### Разрешение запросов к localhost из Android-приложения ###
+```BASH
+~/Android/Sdk/platform-tools/adb reverse tcp:8080 tcp:8080
 ```
 
 ## README ##
