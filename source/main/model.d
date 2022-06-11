@@ -13,7 +13,7 @@ import vibe.data.serialization;
     @Generated long id;
     @Column string name;
     @Column string key;
-    
+
     @ignore //serialization
     @OneToMany("group") User[] users;
 
@@ -38,15 +38,16 @@ import vibe.data.serialization;
     @Generated long id;
     @Column string name;
     @Column string key;
-    
+
     @ignore //serialization
     @ManyToOne @JoinColumn("group_fk") Group group;
     @ignore //serialization
     @OneToMany("owner") PrayerRequest[] prayerList;
+    @ignore @OneToOne("user") Reading kathisma;
 
     override string toString()
     {
-        return "User {%s, %s, %s, %s, %s}".format(id, name, key, prayerList, group);
+        return "User {%s, %s, %s, %s, %s, %s}".format(id, name, key, prayerList, group, kathisma);
     }
 
     this()
@@ -60,10 +61,27 @@ import vibe.data.serialization;
     }
 }
 
-struct Reading
+@Entity class Reading
 {
-    int kathismaNumber;
-    string userId;
+    @Generated long id;
+    @Column ubyte kathismaNumber;
+    @ignore //serialization
+    @OneToOne @JoinColumn("user_fk") User user;
+
+    override string toString()
+    {
+        return "Reading {%s, %s}".format(id, kathismaNumber);
+    }
+
+    this()
+    {
+    }
+
+    this(ubyte kathismaNumber)
+    {
+        this.kathismaNumber = kathismaNumber;
+    }
+
 }
 
 struct Reminder

@@ -24,5 +24,8 @@
 	"buildRequirements": [
 		"allowWarnings"
 	],
-	"versions": []
+	"versions": [],
+	"dflags": [
+		"-debug=EventCoreLeakTrace"
+	]
 }

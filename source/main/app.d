@@ -7,6 +7,7 @@ import ddbc.drivers.mysqlddbc;
 import hibernated.core;
 import std.stdio : writeln;
 import std.datetime;
+import vibe.data.json;
 import model;
 
 alias hibernated.session.Session Session;
@@ -28,6 +29,15 @@ interface DataStore
     @method(HTTPMethod.POST)
     @path("add_user")
     long addUser(string name, string key, int groupId);
+
+    /**
+	responce format {"result":true}
+	*/
+    @method(HTTPMethod.POST)
+    Json checkUser(string userKey);
+
+    @method(HTTPMethod.GET)
+    Reading getUserKathisma(string userKey);
 
     // GET /all_groups -> responds {"id": "...", "name": ...}
     @path("group/all")
@@ -98,6 +108,19 @@ class DataStoreImpl : DataStore
         return newUser.id;
     }
 
+    Json checkUser(string userKey)
+    {
+        Json response = Json.emptyObject();
+        response["result"] = getUser(userKey) !is null;
+        return response;
+    }
+
+    Reading getUserKathisma(string userKey)
+    {
+        User user = getUser(userKey);
+        return user !is null ? user.kathisma : null;
+    }
+
     //    private
     //    {
     //        User[] users;
@@ -161,6 +184,9 @@ class DataStoreImpl : DataStore
         PrayerRequest[] list = sess.createQuery("FROM PrayerRequest WHERE id=:Id")
             .setParameter("Id", id).list!PrayerRequest();
 
+        if (list.length == 0)
+            return null;
+
         return list[0];
     }
 
@@ -201,7 +227,7 @@ void confORM()
 void main()
 {
     // create metadata from annotations
-    EntityMetaData schema = new SchemaInfoImpl!(User, Group, PrayerRequest);
+    EntityMetaData schema = new SchemaInfoImpl!(User, Group, PrayerRequest, Reading);
 
     // setup DB connection factory
     MySQLDriver driver = new MySQLDriver();
@@ -239,17 +265,19 @@ void main()
     //    pr1.name = "Ioann";
     //    PrayerRequest pr2 = new PrayerRequest();
     //    pr2.name = "Lidiya";
+    //    Reading r1 = new Reading(3);
     //    Group g1 = new Group("Group1", "402jgh255");
     //    User u1 = new User("User1", "1234567890");
-    //    u1.prayerList = [pr1, pr2];
     //    pr1.owner = u1;
     //    pr2.owner = u1;
+    //    r1.user = u1;
     //    u1.group = g1;
     //
     //    sess.save(g1);
     //    sess.save(u1);
     //    sess.save(pr1);
     //    sess.save(pr2);
+    //    sess.save(r1);
     //
     //    writeln(u1);
     //    // load and check data
