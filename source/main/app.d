@@ -8,7 +8,9 @@ import hibernated.core;
 import std.stdio : writeln;
 import std.datetime;
 import vibe.data.json;
+import std.conv;
 import model;
+import utils;
 
 alias hibernated.session.Session Session;
 
@@ -43,12 +45,13 @@ interface DataStore
     @path("group/all")
     Group[] getAllGroups();
 
+    ///returns 20 new users
     @method(HTTPMethod.POST)
     @path("add_group")
-    long addGroup(string name, string key);
+    User[] addGroup(string name, string key, string creationDate);
 
     long addPrayerRequest(string userKey, string prescript, string name, string surname,
-            string common, string prayerType, string readingPeriod, string createdDate);
+            string common, string prayerType, string readingPeriod, string creationDate);
 
     PrayerRequest[] getPrayerListForUser(string userKey);
 
@@ -139,21 +142,47 @@ class DataStoreImpl : DataStore
         return q.list!Group();
     }
 
-    long addGroup(string name, string key)
+    User[] add20NewUsers(Group toGroup)
     {
-        Group g = new Group();
-        g.name = name;
-        g.key = key;
-        sess.save(g);
-        return g.id;
+        ubyte count = 20;
+        User[] list = new User[count];
+        for (ubyte i = 0; i < count; i++)
+        {
+            Reading r = new Reading(i);
+            User u = new User("Чтец " ~ (i + 1).to!string, randomAlphanumericString(10));
+            r.user = u;
+            u.group = toGroup;
+
+            sess.save(u);
+            sess.save(r);
+            list[i] = u;
+        }
+        return list;
+    }
+
+    User[] addGroup(string name, string key, string creationDate)
+    {
+        Group[] list = sess.createQuery("FROM Group WHERE key=:Key")
+            .setParameter("Key", key).list!Group();
+        if (list.length == 0)
+        {
+            Group g = new Group(name, key, creationDate);
+            sess.save(g);
+            logInfo("Created %s", g);
+            return add20NewUsers(g);
+        }
+        else
+        {
+            return list[0].users;
+        }
     }
 
     long addPrayerRequest(string userKey, string prescript, string name, string surname,
-            string common, string prayerType, string readingPeriod, string createdDate)
+            string common, string prayerType, string readingPeriod, string creationDate)
     {
         User user = getUser(userKey);
         PrayerRequest prayerRequest = new PrayerRequest(prescript, name,
-                surname, common, prayerType, readingPeriod, createdDate);
+                surname, common, prayerType, readingPeriod, creationDate);
         prayerRequest.owner = user;
         logInfo("prayerRequest = %s", prayerRequest);
 
@@ -204,11 +233,6 @@ class DataStoreImpl : DataStore
     //    string[] getPrayerListForGroup(string groupName)
     //    {
     //        return [];
-    //    }
-    //
-    //    bool checkPassword(string user, string password)
-    //    {
-    //        return user == "admin" && password == "secret";
     //    }
 }
 
@@ -323,7 +347,8 @@ private void addSampleDataToDB()
     {
         runTask({
             auto client = new RestInterfaceClient!DataStore("http://127.0.0.1:8080/");
-            long i = client.addPrayerRequest();
+            long i = client.addPrayerRequest("1234567890", "мл.", "Георгий",
+                "Панина", "true", "ABOUT_ALIVE", "ALWAYS", "2022-03-20");
             logInfo("client.addPrayerRequest() returns %s", i);
         });
     }
