@@ -8,55 +8,78 @@ import hibernated.core;
 import std.stdio : writeln;
 import std.datetime;
 import vibe.data.json;
-import std.conv;
+import std.conv : to;
 import model;
 import utils;
 
 alias hibernated.session.Session Session;
 
+/** Интерфейс взаимодействия REST API
+*/
 @path("api")
 interface DataStore
 {
 
+    /** Возвращает пользователя по ключу. */
     @method(HTTPMethod.GET)
     User getUser(string key);
 
     // GET /all_users -> responds {"id": "...", "name": ... , ...}
     // curl localhost:8080/api/user/all
     @path("user/all")
-    User[] getAllUsers();
+    User[] getAllUsers(); // TODO: remove this method
 
+    /** Добавляет пользователя */
     // The following curl command adds a user:
     // curl -X POST localhost:8080/api/add_user -H 'Content-Type: application/json' -d '{"name":"noname", "key":"secret", "groupId":1}'
     @method(HTTPMethod.POST)
     @path("add_user")
     long addUser(string name, string key, int groupId);
 
-    /**
-	responce format {"result":true}
+    /** Проверяет наличие позьзователя по ключу userKey в базе.
+    Возвращает ответ в формате {"result":true}
 	*/
     @method(HTTPMethod.POST)
     Json checkUser(string userKey);
 
+    /** Возвращает номер кафизмы, 
+	которую пользователю нужно сегодня прочитать.
+	Принимает ключ пользователя.
+	*/
     @method(HTTPMethod.GET)
     Reading getUserKathisma(string userKey);
 
     // GET /all_groups -> responds {"id": "...", "name": ...}
     @path("group/all")
-    Group[] getAllGroups();
+    Group[] getAllGroups(); //TODO: remove this method
 
-    ///returns 20 new users
+    /** Создает группу и возвращает 20 созданных пользователей, 
+	принадлежащих группе
+	*/
     @method(HTTPMethod.POST)
     @path("add_group")
     User[] addGroup(string name, string key, string creationDate);
 
+    /** Добавляет имя для поминовения 
+	Params: 
+	    userKey = ключ пользователя
+	    prescript = приписка к имени (мл., отр., н.пр.)
+	    name = имя для поминовения
+	    surname = фамилия человека, добавившего имя
+        common = добавлять ли имя в записки других членов группы
+        prayerType = тип поминовения, доступны: {ABOUT_ALIVE,ABOUT_DECEASED,ABOUT_LOST}
+        readingPeriod = период чтения, доступны {FORTY_DAYS,ONE_MONTH,SIX_MONTHS,ONE_YEAR,ALWAYS,CUSTOM} 
+        creationDate = дата добавления имени
+	*/
     long addPrayerRequest(string userKey, string prescript, string name, string surname,
             string common, string prayerType, string readingPeriod, string creationDate);
 
+    /** Возвращает список поминовения для пользователя */
     PrayerRequest[] getPrayerListForUser(string userKey);
 
     PrayerRequest[] getPrayerListForGroup(string groupKey);
 
+    /** Возвращает имя для поминовения по id записи в базе */
     PrayerRequest getPrayerRequest(long key);
 
     //
@@ -70,6 +93,9 @@ interface DataStore
 
 }
 
+/** Класс для полключения REST API
+ и взаимодействия с БД
+*/
 class DataStoreImpl : DataStore
 {
     Session sess;
@@ -144,11 +170,11 @@ class DataStoreImpl : DataStore
 
     User[] add20NewUsers(Group toGroup)
     {
-        ubyte count = 20;
+        uint count = 20;
         User[] list = new User[count];
-        for (ubyte i = 0; i < count; i++)
+        for (uint i = 0; i < count; i++)
         {
-            Reading r = new Reading(i);
+            Reading r = new Reading(i + 1);
             User u = new User("Чтец " ~ (i + 1).to!string, randomAlphanumericString(10));
             r.user = u;
             u.group = toGroup;
@@ -234,6 +260,7 @@ class DataStoreImpl : DataStore
     //    {
     //        return [];
     //    }
+
 }
 
 /*
@@ -250,84 +277,98 @@ void confORM()
 
 void main()
 {
-    // create metadata from annotations
-    EntityMetaData schema = new SchemaInfoImpl!(User, Group, PrayerRequest, Reading);
-
-    // setup DB connection factory
-    MySQLDriver driver = new MySQLDriver();
-    string url = MySQLDriver.generateUrl("localhost", 3306, "api_db");
-    string[string] params = MySQLDriver.setUserAndPassword("api", "LestvitsaDev");
-    Dialect dialect = new MySQLDialect();
-
-    DataSource ds = new ConnectionPoolDataSourceImpl(driver, url, params);
-
-    // create session factory
-    SessionFactory factory = new SessionFactoryImpl(schema, dialect, ds);
-    scope (exit)
-        factory.close();
-
-    // Create schema if necessary
+    try
     {
-        // get connection
-        Connection conn = ds.getConnection();
+        // create metadata from annotations
+        EntityMetaData schema = new SchemaInfoImpl!(User, Group, PrayerRequest, Reading);
+
+        // setup DB connection factory
+        MySQLDriver driver = new MySQLDriver();
+        string url = MySQLDriver.generateUrl("localhost", 3306, "api_db");
+        string[string] params = MySQLDriver.setUserAndPassword("api", "LestvitsaDev");
+        Dialect dialect = new MySQLDialect();
+
+        DataSource ds = new ConnectionPoolDataSourceImpl(driver, url, params);
+
+        // create session factory
+        SessionFactory factory = new SessionFactoryImpl(schema, dialect, ds);
         scope (exit)
-            conn.close();
-        // create tables if not exist
-        factory.getDBMetaData().updateDBSchema(conn, false, true);
+            factory.close();
+
+        // Create schema if necessary
+        {
+            // get connection
+            Connection conn = ds.getConnection();
+            scope (exit)
+                conn.close();
+            // create tables if not exist
+            factory.getDBMetaData().updateDBSchema(conn, false, true);
+        }
+
+        // Now you can use HibernateD
+
+        // create session
+        hibernated.session.Session sess = factory.openSession();
+        scope (exit)
+            sess.close();
+
+        /////////////////////////////////////////////////////
+        //    // create sample data
+        //    PrayerRequest pr1 = new PrayerRequest();
+        //    pr1.name = "Ioann";
+        //    PrayerRequest pr2 = new PrayerRequest();
+        //    pr2.name = "Lidiya";
+        //    Reading r1 = new Reading(3);
+        //    Group g1 = new Group("Group1", "402jgh255");
+        //    User u1 = new User("User1", "1234567890");
+        //    pr1.owner = u1;
+        //    pr2.owner = u1;
+        //    r1.user = u1;
+        //    u1.group = g1;
+        //
+        //    sess.save(g1);
+        //    sess.save(u1);
+        //    sess.save(pr1);
+        //    sess.save(pr2);
+        //    sess.save(r1);
+        //
+        //    writeln(u1);
+        //    // load and check data
+        //    User u11 = sess.createQuery("FROM User WHERE name=:Name")
+        //        .setParameter("Name", "User1").list!User()[$ - 1];
+        //
+        //    writeln(u11);
+        /////////////////////////////////////////////////////
+
+        // use session to access DB
+        auto dataStore = new DataStoreImpl(sess);
+
+        auto router = new URLRouter;
+        router.registerRestInterface(dataStore);
+
+        auto settings = new HTTPServerSettings;
+        settings.port = 8080;
+        settings.bindAddresses = ["::1", "127.0.0.1"];
+        listenHTTP(settings, router);
+
+        logInfo("Server started on http://127.0.0.1:8080/");
+
+        addSampleDataToDB();
+
+        runApplication();
+    }
+    catch (Exception e)
+    {
+        writeln(e.msg);
     }
 
-    // Now you can use HibernateD
+}
 
-    // create session
-    hibernated.session.Session sess = factory.openSession();
-    scope (exit)
-        sess.close();
+private void doSomething()
+{
+    import std.datetime;
 
-    /////////////////////////////////////////////////////
-    //    // create sample data
-    //    PrayerRequest pr1 = new PrayerRequest();
-    //    pr1.name = "Ioann";
-    //    PrayerRequest pr2 = new PrayerRequest();
-    //    pr2.name = "Lidiya";
-    //    Reading r1 = new Reading(3);
-    //    Group g1 = new Group("Group1", "402jgh255");
-    //    User u1 = new User("User1", "1234567890");
-    //    pr1.owner = u1;
-    //    pr2.owner = u1;
-    //    r1.user = u1;
-    //    u1.group = g1;
-    //
-    //    sess.save(g1);
-    //    sess.save(u1);
-    //    sess.save(pr1);
-    //    sess.save(pr2);
-    //    sess.save(r1);
-    //
-    //    writeln(u1);
-    //    // load and check data
-    //    User u11 = sess.createQuery("FROM User WHERE name=:Name")
-    //        .setParameter("Name", "User1").list!User()[$ - 1];
-    //
-    //    writeln(u11);
-    /////////////////////////////////////////////////////
-
-    // use session to access DB
-    auto dataStore = new DataStoreImpl(sess);
-
-    auto router = new URLRouter;
-    router.registerRestInterface(dataStore);
-
-    auto settings = new HTTPServerSettings;
-    settings.port = 8080;
-    settings.bindAddresses = ["::1", "127.0.0.1"];
-    listenHTTP(settings, router);
-
-    logInfo("Server started on http://127.0.0.1:8080/");
-
-    addSampleDataToDB();
-
-    runApplication();
-
+    logInfo("The time is: %s", Clock.currTime());
 }
 
 private void addSampleDataToDB()

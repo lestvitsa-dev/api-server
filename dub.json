@@ -24,8 +24,23 @@
 	"buildRequirements": [
 		"allowWarnings"
 	],
+	"buildTypes": {
+		"docs": {
+			"buildOptions": [
+				"syntaxOnly"
+			],
+			"dflags": [
+				"-c",
+				"-Dddocs"
+			],
+			"buildRequirements": [
+				"allowWarnings"
+			]
+		}
+	},
 	"versions": [],
 	"dflags": [
-		"-debug=EventCoreLeakTrace"
+		"-debug=EventCoreLeakTrace",
+		"-d"
 	]
 }

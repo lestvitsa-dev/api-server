@@ -66,7 +66,7 @@ import vibe.data.serialization;
 @Entity class Reading
 {
     @Generated long id;
-    @Column ubyte kathismaNumber;
+    @Column uint kathismaNumber;
     @ignore //serialization
     @OneToOne @JoinColumn("user_fk") User user;
 
@@ -79,7 +79,7 @@ import vibe.data.serialization;
     {
     }
 
-    this(ubyte kathismaNumber)
+    this(uint kathismaNumber)
     {
         this.kathismaNumber = kathismaNumber;
     }
