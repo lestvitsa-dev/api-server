@@ -122,7 +122,7 @@ enum Period
 
     @Column @Null string prayerType = to!string(PrayerType.ABOUT_ALIVE);
     @Column @Null string readingPeriod = Period.FORTY_DAYS;
-    @Column @Null string creationDate; //... = Date(2022, 6, 1)
+    @Column @Null string creationDate; //... = "2022-06-01"
 
     @ignore //serialization
     @ManyToOne @JoinColumn("owner_fk") User owner;

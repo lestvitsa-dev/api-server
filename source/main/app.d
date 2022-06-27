@@ -5,10 +5,11 @@ import vibe.http.server;
 import vibe.web.rest;
 import ddbc.drivers.mysqlddbc;
 import hibernated.core;
-import std.stdio : writeln;
+import std.stdio : writeln, stderr;
 import std.datetime;
 import vibe.data.json;
 import std.conv : to;
+import std.functional : toDelegate;
 import model;
 import utils;
 
@@ -19,6 +20,9 @@ alias hibernated.session.Session Session;
 @path("api")
 interface DataStore
 {
+    @method(HTTPMethod.GET)
+    @path("next")
+    void updateToNextKathisma(); // TODO: remove this method from interface
 
     /** Возвращает пользователя по ключу. */
     @method(HTTPMethod.GET)
@@ -261,6 +265,51 @@ class DataStoreImpl : DataStore
     //        return [];
     //    }
 
+    /// Обновляет номер кафизмы. Функция должна вызываться ежедневно.
+    void updateToNextKathisma()
+    {
+        Reading[] list = sess.createQuery("FROM Reading").list!Reading();
+        foreach (e; list)
+        {
+            e.kathismaNumber %= 20;
+            e.kathismaNumber++;
+
+            sess.update(e);
+        }
+    }
+
+    /** Обновляет список О упокоеннии.
+        Через 40 дней отметка н.пр. исчезает.
+    */
+    void updateDeceasedLists()
+    {
+        import std.string : indexOf, strip;
+
+        string myPrescript = "н.пр.";
+
+        auto list = sess.createQuery("FROM PrayerRequest ORDER BY prescript").list!PrayerRequest();
+        foreach (prRequest; list)
+        {
+            try
+            {
+                Date creationDate = Date.fromISOExtString(prRequest.creationDate);
+                ptrdiff_t idx;
+                if (creationDate + 40.days < cast(Date) Clock.currTime()
+                        && (idx = prRequest.prescript.indexOf(myPrescript)) > -1)
+                {
+                    prRequest.prescript = (
+                            prRequest.prescript[0 .. idx]
+                            ~ prRequest.prescript[idx + myPrescript.length .. $]).strip();
+                    sess.update(prRequest);
+                }
+            }
+            catch (DateTimeException e)
+            {
+                stderr.writeln(e.msg);
+                return;
+            }
+        }
+    }
 }
 
 /*
@@ -353,22 +402,30 @@ void main()
 
         logInfo("Server started on http://127.0.0.1:8080/");
 
+        auto delay = TimeOfDay(23, 59, 59) - cast(TimeOfDay) Clock.currTime() + 1.seconds;
+        logInfo("Delay for timer is: %s", delay);
+        setTimer(delay, { // timer to update kathisma number
+            doDailyTasks(dataStore);
+            setTimer(1.days, toDelegate({ doDailyTasks(dataStore); }), true);
+        });
+
+        setTimer(1.days, toDelegate(&dataStore.updateDeceasedLists), true);
+
         addSampleDataToDB();
 
         runApplication();
     }
     catch (Exception e)
     {
-        writeln(e.msg);
+        stderr.writeln(e.msg);
     }
 
 }
 
-private void doSomething()
+private void doDailyTasks(DataStoreImpl dataStore)
 {
-    import std.datetime;
-
-    logInfo("The time is: %s", Clock.currTime());
+    dataStore.updateToNextKathisma();
+    dataStore.updateDeceasedLists();
 }
 
 private void addSampleDataToDB()
